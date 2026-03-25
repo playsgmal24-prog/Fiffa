@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Fiffa - Practice Hub</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0a0a0a; font-family: 'Segoe UI', sans-serif; user-select: none; touch-action: none; }
+        
+        /* Menus */
+        #menu-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        #main-menu, #practice-menu { display: flex; flex-direction: column; align-items: center; }
+        #practice-menu { display: none; }
+
+        #wallet-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 215, 0, 0.2);
+            border: 1px solid #FFD700;
+            padding: 8px 15px;
+            border-radius: 20px;
+            color: #FFD700;
+            font-weight: 900;
+            font-size: 20px;
+        }
+
+        #menu-title {
+            font-size: clamp(40px, 10vw, 80px);
+            font-weight: 900; color: #fff; margin-bottom: 30px; font-style: italic;
+            background: linear-gradient(to bottom, #fff, #888);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .menu-btn {
+            width: 260px; padding: 18px; margin: 8px;
+            background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.4);
+            color: white; font-size: 18px; font-weight: 700; text-transform: uppercase;
+            border-radius: 12px; cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .menu-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.2); }
+        .back-btn { border-color: #ff416c; color: #ff416c; margin-top: 20px; }
+
+        /* HUD */
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-weight: 800; pointer-events: none; z-index: 10; display: none; }
+        #scoreboard { font-size: 24px; margin-bottom: 5px; }
+        #timer { font-size: 18px; color: #FFD700; background: rgba(0,0,0,0.4); padding: 2px 10px; border-radius: 4px; display: inline-block; }
+        
+        /* Goal Pop Up Effect */
+        .goal-popup {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            color: #FFD700; font-size: 48px; font-weight: 900;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            pointer-events: none; z-index: 50;
+            animation: popOut 1.5s ease-out forwards;
+        }
+        @keyframes popOut {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            20% { transform: translate(-50%, -60%) scale(1.2); opacity: 1; }
+            80% { transform: translate(-50%, -80%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -100%) scale(0.8); opacity: 0; }
+        }
+        
+        #joystick-container { position: absolute; bottom: 30px; left: 30px; width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); backdrop-filter: blur(5px); z-index: 20; display: none; }
+        #knob { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; background: #fff; border-radius: 50%; }
+        
+        #controls { position: absolute; bottom: 30px; right: 30px; display: none; flex-direction: row; gap: 15px; align-items: flex-end; z-index: 20; }
+        .button-stack { display: flex; flex-direction: column; gap: 15px; align-items: center; }
+        .btn { width: 75px; height: 75px; border: 3px solid #fff; border-radius: 50%; color: white; font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
+        #shoot-btn { background: linear-gradient(135deg, #ff416c, #ff4b2b); width: 85px; height: 85px; font-size: 15px; }
+        #sprint-btn { background: linear-gradient(135deg, #FFD700, #FFA500); width: 70px; height: 70px; }
+        #tackle-btn { background: linear-gradient(135deg, #4776E6, #8E54E9); }
+        #exit-btn { position: absolute; top: 20px; right: 20px; padding: 10px 20px; background: rgba(0,0,0,0.5); color: white; border: 1px solid white; border-radius: 5px; display: none; z-index: 30; }
+    </style>
+</head>
+<body>
+    <div id="menu-overlay">
+        <div id="wallet-display">€<span id="balance">0</span></div>
+        <div id="menu-title">FIFFA</div>
+        <div id="main-menu">
+            <div class="menu-btn" id="play-ai-btn">Play vs AI</div>
+            <div class="menu-btn" id="go-practice-btn">Practice Mode</div>
+        </div>
+        <div id="practice-menu">
+            <div class="menu-btn" id="free-play-btn">Free Play</div>
+            <div class="menu-btn" id="shooting-btn">Shooting Drill</div>
+            <div class="menu-btn" id="1v1-btn">1 vs 1</div>
+            <div class="menu-btn back-btn" id="back-to-main">Back</div>
+        </div>
+    </div>
+
+    <div id="ui">
+        <div id="scoreboard">P1 <span id="p1">0</span> — <span id="p2">0</span> AI</div>
+        <div id="timer">00:00</div>
+    </div>
+    <div id="exit-btn">QUIT</div>
+    <div id="joystick-container"><div id="knob"></div></div>
+    <div id="controls">
+        <div id="tackle-btn" class="btn">TACKLE</div>
+        <div class="button-stack">
+            <div id="sprint-btn" class="btn">SPRINT</div>
+            <div id="shoot-btn" class="btn">SHOOT</div>
+        </div>
+    </div>
+
+    <script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }</script>
+    <script type="module">
+        import * as THREE from 'three';
+
+        let gameMode = 'menu';
+        let isSprinting = false;
+        let matchSeconds = 0;
+        let matchInterval;
+        
+        let money = parseInt(localStorage.getItem('fiffa_money')) || 0;
+        const updateWalletUI = () => { document.getElementById('balance').innerText = money; };
+        updateWalletUI();
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a1a);
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(15, 25, 15); scene.add(dirLight);
+
+        const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
+        const ctx = canvas.getContext('2d'); ctx.fillStyle = '#2e7d32'; ctx.fillRect(0,0,256,256);
+        for(let i=0; i<8000; i++) { ctx.fillStyle = Math.random() > 0.5 ? '#388e3c' : '#256629'; ctx.fillRect(Math.random()*256, Math.random()*256, 2, 6); }
+        const grassTex = new THREE.CanvasTexture(canvas); grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping; grassTex.repeat.set(10, 15);
+        const pitch = new THREE.Mesh(new THREE.PlaneGeometry(30, 50), new THREE.MeshPhongMaterial({ map: grassTex }));
+        pitch.rotation.x = -Math.PI / 2; scene.add(pitch);
+
+        const LIMIT_X = 14.2, LIMIT_Z = 24.2;
+
+        function createFence(w, h, d, x, z) {
+            const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshPhongMaterial({ color: 0xffffff }));
+            f.position.set(x, h/2, z); scene.add(f);
+        }
+        createFence(1, 1.5, 50, -15.5, 0); createFence(1, 1.5, 50, 15.5, 0); 
+        createFence(11, 1.5, 1, -10, 25.5); createFence(11, 1.5, 1, 10, 25.5);
+        createFence(11, 1.5, 1, -10, -25.5); createFence(11, 1.5, 1, 10, -25.5);
+
+        function createGoal(zPos) {
+            const g = new THREE.Group();
+            const mat = new THREE.MeshPhongMaterial({ color: 0xffffff });
+            const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.5), mat); p1.position.set(-4, 1.75, 0);
+            const p2 = p1.clone(); p2.position.set(4, 1.75, 0);
+            const cross = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 8.2), mat);
+            cross.rotation.z = Math.PI/2; cross.position.y = 3.5;
+            g.add(p1, p2, cross); g.position.z = zPos; return g;
+        }
+        scene.add(createGoal(-25), createGoal(25));
+
+        function createChibi(color, isOpponent = false) {
+            const group = new THREE.Group();
+            const bodyGroup = new THREE.Group();
+            const head = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.MeshPhongMaterial({color: 0xffdbac}));
+            head.position.y = 2.1;
+            const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 0.9), new THREE.MeshPhongMaterial({color: color}));
+            body.position.y = 1.1;
+            bodyGroup.add(head, body); group.add(bodyGroup);
+            if(isOpponent) group.rotation.y = Math.PI;
+            group.bodyGroup = bodyGroup; return group;
+        }
+
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), new THREE.MeshPhongMaterial({color: 0xffffff}));
+        ball.position.y = 0.5; scene.add(ball);
+
+        const player = createChibi(0x75aadb); player.position.set(0, 0, 15); scene.add(player);
+        const opponent = createChibi(0xf44336, true); opponent.position.set(0, 0, -15); scene.add(opponent);
+        const gkAI = createChibi(0xffeb3b, true); gkAI.position.set(0, 0, -23.5); scene.add(gkAI);
+        const gkPlayer = createChibi(0x4caf50); gkPlayer.position.set(0, 0, 23.5); scene.add(gkPlayer);
+
+        let moveDir = { x: 0, z: 0 }, ballVel = { x: 0, z: 0 }, scores = { p1: 0, p2: 0 };
+        let isTackling = false, tackleTimer = 0;
+
+        function showGoalPop(text) {
+            const el = document.createElement('div'); el.className = 'goal-popup';
+            el.innerText = text; document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1500);
+        }
+
+        const startMatch = (mode) => {
+            gameMode = mode;
+            document.getElementById('menu-overlay').style.display = 'none';
+            document.getElementById('joystick-container').style.display = 'block';
+            document.getElementById('controls').style.display = 'flex';
+            document.getElementById('exit-btn').style.display = 'block';
+            
+            const isComp = (mode === 'ai');
+            document.getElementById('ui').style.display = isComp ? 'block' : 'none';
+
+            scores.p1 = 0; scores.p2 = 0;
+            document.getElementById('p1').innerText = 0; document.getElementById('p2').innerText = 0;
+            
+            clearInterval(matchInterval);
+            if (isComp) {
+                matchSeconds = 0;
+                updateTimerUI();
+                matchInterval = setInterval(() => {
+                    matchSeconds++;
+                    updateTimerUI();
+                    if (matchSeconds >= 90) endGame();
+                }, 1000);
+            }
+
+            opponent.visible = (mode === 'ai' || mode === '1v1');
+            gkAI.visible = (mode === 'ai' || mode === 'shooting' || mode === '1v1');
+            gkPlayer.visible = (mode === 'ai' || mode === '1v1');
+        };
+
+        const updateTimerUI = () => {
+            const gameMinute = matchSeconds.toString().padStart(2, '0');
+            document.getElementById('timer').innerText = `${gameMinute}:00`;
+        };
+
+        const endGame = () => {
+            clearInterval(matchInterval);
+            let earned = scores.p1 * 10;
+            let resultText = "";
+            if (scores.p1 > scores.p2) { earned += 100; resultText = "YOU WON! +€100"; }
+            else if (scores.p1 === scores.p2) { earned += 20; resultText = "DRAW! +€20"; }
+            else { resultText = "DEFEAT! +€0"; }
+            money += earned;
+            localStorage.setItem('fiffa_money', money);
+            updateWalletUI();
+            alert(`${resultText}\nGoal Bonus: €${scores.p1 * 10}\nTotal Earned: €${earned}`);
+            quitGame();
+        };
+
+        const quitGame = () => {
+            gameMode = 'menu'; clearInterval(matchInterval);
+            document.getElementById('menu-overlay').style.display = 'flex';
+            document.getElementById('ui').style.display = 'none';
+            document.getElementById('joystick-container').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+            document.getElementById('exit-btn').style.display = 'none';
+            ball.position.set(0, 0.5, 0); ballVel = {x:0, z:0};
+        };
+
+        document.getElementById('play-ai-btn').addEventListener('touchstart', () => startMatch('ai'));
+        document.getElementById('go-practice-btn').addEventListener('touchstart', () => { document.getElementById('main-menu').style.display = 'none'; document.getElementById('practice-menu').style.display = 'flex'; });
+        document.getElementById('back-to-main').addEventListener('touchstart', () => { document.getElementById('main-menu').style.display = 'flex'; document.getElementById('practice-menu').style.display = 'none'; });
+        document.getElementById('free-play-btn').addEventListener('touchstart', () => startMatch('free'));
+        document.getElementById('shooting-btn').addEventListener('touchstart', () => startMatch('shooting'));
+        document.getElementById('1v1-btn').addEventListener('touchstart', () => startMatch('1v1'));
+        document.getElementById('exit-btn').addEventListener('touchstart', quitGame);
+
+        document.addEventListener('touchstart', handleTouch, {passive: false});
+        document.addEventListener('touchmove', handleTouch, {passive: false});
+        document.addEventListener('touchend', () => { moveDir = {x:0, z:0}; document.getElementById('knob').style.transform = 'translate(0,0)'; });
+
+        function handleTouch(e) {
+            if(gameMode === 'menu') return;
+            const rect = document.getElementById('joystick-container').getBoundingClientRect();
+            for(let t of e.touches) {
+                if (t.clientX < window.innerWidth/2) {
+                    const dx = t.clientX - (rect.left + rect.width/2);
+                    const dy = t.clientY - (rect.top + rect.height/2);
+                    const maxDist = rect.width/2;
+                    const dist = Math.min(Math.sqrt(dx*dx + dy*dy), maxDist);
+                    moveDir.x = (dx / maxDist) * (dist / maxDist);
+                    moveDir.z = (dy / maxDist) * (dist / maxDist);
+                    document.getElementById('knob').style.transform = `translate(${moveDir.x * maxDist}px, ${moveDir.z * maxDist}px)`;
+                }
+            }
+        }
+
+        const sprBtn = document.getElementById('sprint-btn');
+        sprBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isSprinting = true; sprBtn.style.transform = 'scale(0.9)'; });
+        sprBtn.addEventListener('touchend', () => { isSprinting = false; sprBtn.style.transform = 'scale(1)'; });
+
+        document.getElementById('shoot-btn').addEventListener('touchstart', () => {
+            if (player.position.distanceTo(ball.position) < 2.5) {
+                const dx = ball.position.x - player.position.x;
+                const dz = ball.position.z - player.position.z;
+                const mag = Math.sqrt(dx*dx + dz*dz) || 1;
+                ballVel.x = (dx/mag) * 2.3; ballVel.z = (dz/mag) * 2.3;
+            }
+        });
+
+        document.getElementById('tackle-btn').addEventListener('touchstart', () => {
+            if(!isTackling) { isTackling = true; tackleTimer = 22; player.bodyGroup.rotation.x = -Math.PI / 2.5; player.bodyGroup.position.y = -0.5; }
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if(gameMode === 'menu') { renderer.render(scene, camera); return; }
+
+            let currentSpeed = isSprinting ? 0.38 : 0.18;
+            if(isTackling) {
+                currentSpeed = 0.45; tackleTimer--;
+                if(player.position.distanceTo(ball.position) < 2.2) {
+                    ballVel.x += (ball.position.x - player.position.x) * 0.3;
+                    ballVel.z += (ball.position.z - player.position.z) * 0.3;
+                }
+                if(tackleTimer <= 0) { isTackling = false; player.bodyGroup.rotation.x = 0; player.bodyGroup.position.y = 0; }
+            }
+
+            player.position.x += moveDir.x * currentSpeed;
+            player.position.z += moveDir.z * currentSpeed;
+
+            if(gameMode === 'ai' || gameMode === '1v1') {
+                const angle = Math.atan2(ball.position.z - opponent.position.z, ball.position.x - opponent.position.x);
+                opponent.position.x += Math.cos(angle) * 0.12; opponent.position.z += Math.sin(angle) * 0.12;
+            }
+            if(gameMode !== 'free') gkAI.position.x = Math.max(-3.5, Math.min(3.5, ball.position.x * 0.8));
+            if(gameMode === 'ai' || gameMode === '1v1') gkPlayer.position.x = Math.max(-3.5, Math.min(3.5, ball.position.x * 0.4));
+
+            ball.position.x += ballVel.x; ball.position.z += ballVel.z;
+            ballVel.x *= 0.96; ballVel.z *= 0.96;
+
+            [player, opponent, gkAI, gkPlayer].forEach(p => {
+                if(!p.visible) return;
+                if (Math.abs(p.position.x) > LIMIT_X) p.position.x = Math.sign(p.position.x) * LIMIT_X;
+                if (Math.abs(p.position.z) > LIMIT_Z && Math.abs(p.position.x) > 4) p.position.z = Math.sign(p.position.z) * LIMIT_Z;
+                if (p.position.distanceTo(ball.position) < 1.4) {
+                    ballVel.x += (ball.position.x - p.position.x) * 0.1;
+                    ballVel.z += (ball.position.z - p.position.z) * 0.1;
+                }
+            });
+
+            if (Math.abs(ball.position.x) > LIMIT_X) { ballVel.x *= -0.7; ball.position.x = Math.sign(ball.position.x) * LIMIT_X; }
+            if (Math.abs(ball.position.z) > LIMIT_Z && Math.abs(ball.position.x) > 4) { ballVel.z *= -0.7; ball.position.z = Math.sign(ball.position.z) * LIMIT_Z; }
+
+            if (Math.abs(ball.position.x) < 4 && Math.abs(ball.position.z) > 25.5) {
+                if(gameMode === 'ai') {
+                    if(ball.position.z < 0) { scores.p1++; showGoalPop("GOAL! +€10"); } 
+                    else { scores.p2++; showGoalPop("CONCEDED!"); }
+                    document.getElementById('p1').innerText = scores.p1; document.getElementById('p2').innerText = scores.p2;
+                } else {
+                    if(ball.position.z < 0) showGoalPop("GOAL!");
+                }
+                ball.position.set(0, 0.5, 0); ballVel = {x:0, z:0};
+            }
+
+            camera.position.lerp(new THREE.Vector3(player.position.x * 0.4, 18, player.position.z + 24), 0.05);
+            camera.lookAt(player.position.x * 0.5, 0, player.position.z - 10);
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
